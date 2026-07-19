@@ -1,0 +1,38 @@
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/triage}
+    username: ${DB_USER:triage}
+    password: ${DB_PASSWORD:triage}
+  jpa:
+    hibernate:
+      ddl-auto: update          # Slice-1 convenience; swap for Flyway later
+    show-sql: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: triage-workers
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.value.default.type: com.triage.ingest.IngestEvent
+        spring.json.trusted.packages: "*"
+
+app:
+  kafka:
+    inbound-topic: tickets.inbound
+  llm:
+    provider: ${LLM_PROVIDER:stub}       # stub | openai
+    openai-api-key: ${OPENAI_API_KEY:}
+    openai-model: ${OPENAI_MODEL:gpt-4o-mini}
+
+logging:
+  level:
+    com.triage: DEBUG

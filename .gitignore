@@ -1,0 +1,8 @@
+backend/.gradle/
+backend/build/
+*.class
+node_modules/
+frontend/dist/
+.idea/
+.env
+.DS_Store
