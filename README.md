@@ -61,4 +61,15 @@ not "multi-agent negotiation". Router: `agents/TriageAgent.java`; handlers/tools
 - **id as cursor:** bigserial → monotonic, correct pagination (vs fragile offset).
 - **Consumer in-app:** simplest; scale horizontally via more instances in the `triage-workers` group.
 
+## Known trade-off / TODO (found during Slice 2 load testing)
+Kafka messages are keyed by `tenantId` (see `IngestService.publish`), which guarantees
+per-tenant ordering but also means **a single tenant's traffic always lands on one
+partition → one consumer instance**, regardless of how many instances are in the
+`triage-workers` group. "3 partitions → scale workers" only gives real parallelism when
+load is spread across >= 3 concurrently-active tenants; this was confirmed by a load
+test where one dominant tenant sent 100% of the load to a single instance even with 3
+instances running. Not a bug — an intentional ordering-vs-parallelism trade-off. Revisit
+if a single "whale" tenant shows up (e.g. key by `tenantId` + shard bucket, or give hot
+tenants a dedicated partition/topic).
+
 See `PLAN.md` for later slices and `HANDOFF.md` for the executor AI.

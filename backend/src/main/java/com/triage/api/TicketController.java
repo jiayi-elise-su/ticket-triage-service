@@ -39,11 +39,16 @@ public class TicketController {
         String key = req.idempotencyKey() != null ? req.idempotencyKey()
                 : idem.deriveKey(tenantId, subject, req.body());
 
-        Long dup = idem.existingTicketId(key);
-        if (dup != null) return Map.of("id", dup, "status", "duplicate");
+        if (!idem.tryClaim(key)) {
+            Long dup = idem.existingTicketId(key);
+            Map<String, Object> resp = new java.util.HashMap<>();
+            resp.put("id", dup);
+            resp.put("status", "duplicate");
+            return resp;
+        }
 
         Ticket t = tickets.save(new Ticket(tenantId, subject, req.body()));
-        idem.claim(key, t.getId());
+        idem.commit(key, t.getId());
         ingest.publish(t.getId(), tenantId);
         return Map.of("id", t.getId(), "status", "accepted");
     }

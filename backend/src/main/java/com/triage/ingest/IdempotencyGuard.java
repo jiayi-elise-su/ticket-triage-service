@@ -25,15 +25,28 @@ public class IdempotencyGuard {
         }
     }
 
-    /** Returns true if newly claimed (proceed), false if already seen (duplicate). */
-    public boolean claim(String idemKey, Long ticketId) {
+    private static final String PENDING = "pending";
+
+    /**
+     * Atomic claim gate: SETNX a placeholder so concurrent callers with the same key
+     * race on a single Redis write, not on a separate check-then-write pair.
+     * Returns true only for the caller that wins the claim (must proceed to
+     * save + publish + commit); false means a duplicate (caller must not save/publish).
+     */
+    public boolean tryClaim(String idemKey) {
         Boolean ok = redis.opsForValue()
-                .setIfAbsent("idem:" + idemKey, String.valueOf(ticketId), Duration.ofHours(24));
+                .setIfAbsent("idem:" + idemKey, PENDING, Duration.ofHours(24));
         return Boolean.TRUE.equals(ok);
     }
 
+    /** Called only by the winning claimer, after the ticket is persisted. */
+    public void commit(String idemKey, Long ticketId) {
+        redis.opsForValue().set("idem:" + idemKey, String.valueOf(ticketId), Duration.ofHours(24));
+    }
+
+    /** Null if unseen, or if a claim is still pending (winner hasn't committed the real id yet). */
     public Long existingTicketId(String idemKey) {
         String v = redis.opsForValue().get("idem:" + idemKey);
-        return v == null ? null : Long.valueOf(v);
+        return (v == null || PENDING.equals(v)) ? null : Long.valueOf(v);
     }
 }
